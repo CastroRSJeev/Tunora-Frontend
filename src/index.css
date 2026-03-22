@@ -1,0 +1,373 @@
+@import "tailwindcss";
+
+/* ─── Tunora Design Tokens (available everywhere) ─── */
+
+:root {
+  /* Core palette */
+  --color-bg: #06060b;
+  --color-bg-alt: #0c0c14;
+  --color-surface: #111118;
+  --color-surface-hover: #191922;
+  --color-surface-active: #1f1f2c;
+  --color-border: #1e1e2e;
+  --color-border-subtle: #161622;
+
+  /* Violet accent */
+  --color-violet-50: #f3e8ff;
+  --color-violet-100: #e9d5ff;
+  --color-violet-200: #d8b4fe;
+  --color-violet-300: #c084fc;
+  --color-violet-400: #a855f7;
+  --color-violet-500: #7c3aed;
+  --color-violet-600: #6d28d9;
+  --color-violet-700: #5b21b6;
+  --color-violet-glow: rgba(124, 58, 237, 0.35);
+
+  /* Text */
+  --color-text-primary: #f0f0f5;
+  --color-text-secondary: #9394a5;
+  --color-text-muted: #55566a;
+
+  /* Status */
+  --color-success: #22c55e;
+  --color-error: #ef4444;
+  --color-warning: #f59e0b;
+
+  /* Typography */
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-heading: 'Outfit', 'Inter', system-ui, sans-serif;
+
+  /* Effects */
+  --glass-bg: rgba(17, 17, 24, 0.65);
+  --glass-bg-heavy: rgba(17, 17, 24, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.06);
+  --glass-blur: 20px;
+
+  /* Shadows */
+  --shadow-glow: 0 0 30px rgba(124, 58, 237, 0.25), 0 0 60px rgba(124, 58, 237, 0.1);
+  --shadow-glow-sm: 0 0 15px rgba(124, 58, 237, 0.2);
+  --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.4);
+
+  /* Transitions */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ─── Tailwind v4 Theme Extensions ─── */
+
+@theme {
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-heading: 'Outfit', 'Inter', system-ui, sans-serif;
+  --color-bg: #06060b;
+  --color-surface: #111118;
+  --color-violet-500: #7c3aed;
+  --color-violet-600: #6d28d9;
+}
+
+/* ─── Global Resets ─── */
+
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: #06060b;
+  color: #f0f0f5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── Scrollbar ─── */
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-violet-600);
+}
+
+/* ─── Utility Classes ─── */
+
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+}
+
+.glass-heavy {
+  background: var(--glass-bg-heavy);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  border: 1px solid var(--glass-border);
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, var(--color-violet-300) 0%, var(--color-violet-500) 50%, var(--color-violet-300) 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.glow-border {
+  box-shadow: var(--shadow-glow-sm);
+  border: 1px solid rgba(124, 58, 237, 0.3);
+}
+
+.glow-border-active {
+  box-shadow: var(--shadow-glow);
+  border: 1px solid rgba(124, 58, 237, 0.6);
+}
+
+/* ─── Animations ─── */
+
+@keyframes songcard-scan {
+  0%   { transform: translateY(-100%); }
+  100% { transform: translateY(200%); }
+}
+
+@keyframes songcard-particle-a {
+  0%   { transform: translate(0, 0); opacity: 0; }
+  30%  { opacity: 1; }
+  100% { transform: translate(18px, -18px); opacity: 0; }
+}
+
+@keyframes songcard-particle-b {
+  0%   { transform: translate(0, 0); opacity: 0; }
+  30%  { opacity: 1; }
+  100% { transform: translate(-18px, -18px); opacity: 0; }
+}
+
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-down {
+  from { opacity: 0; transform: translateY(-24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 20px rgba(124, 58, 237, 0.2); }
+  50% { box-shadow: 0 0 40px rgba(124, 58, 237, 0.4); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.6s var(--ease-out-expo) both;
+}
+
+.animate-slide-up {
+  animation: slide-up 0.7s var(--ease-out-expo) both;
+}
+
+.animate-slide-down {
+  animation: slide-down 0.5s var(--ease-out-expo) both;
+}
+
+.animate-glow-pulse {
+  animation: glow-pulse 3s ease-in-out infinite;
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.animate-gradient {
+  animation: gradient-shift 6s ease infinite;
+  background-size: 200% 200%;
+}
+
+/* Staggered animation delays */
+.delay-100 { animation-delay: 100ms; }
+.delay-200 { animation-delay: 200ms; }
+.delay-300 { animation-delay: 300ms; }
+.delay-400 { animation-delay: 400ms; }
+.delay-500 { animation-delay: 500ms; }
+
+/* ─── Input Styles ─── */
+
+.input-field {
+  width: 100%;
+  padding: 14px 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  color: var(--color-text-primary);
+  font-family: var(--font-body);
+  font-size: 15px;
+  transition: all 0.3s ease;
+  outline: none;
+}
+
+.input-field:focus {
+  border-color: var(--color-violet-500);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15);
+}
+
+.input-field::placeholder {
+  color: var(--color-text-muted);
+}
+
+/* ─── Button Styles ─── */
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 28px;
+  background: linear-gradient(135deg, var(--color-violet-500), var(--color-violet-600));
+  color: white;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 15px;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-glow);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 28px;
+  background: transparent;
+  color: var(--color-text-primary);
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 15px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-secondary:hover {
+  background: var(--color-surface);
+  border-color: var(--color-violet-500);
+  color: var(--color-violet-300);
+}
+
+/* ─── Discover Search Bar ─── */
+
+.discover-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 300px;
+  height: 42px;
+  padding: 0 16px;
+  background: rgba(17, 17, 24, 0.8);
+  border: 1px solid rgba(124, 58, 237, 0.18);
+  border-radius: 12px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.discover-search-wrap:focus-within {
+  border-color: rgba(124, 58, 237, 0.5);
+  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.4), 0 0 0 3px rgba(124, 58, 237, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.discover-search-icon {
+  width: 18px !important;
+  height: 18px !important;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+  transition: color 0.3s ease;
+}
+
+.discover-search-wrap:focus-within .discover-search-icon {
+  color: var(--color-violet-400);
+}
+
+.discover-search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--color-text-primary);
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+
+.discover-search-input::placeholder {
+  color: var(--color-text-muted);
+}
+
+.discover-search-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-violet-400);
+  background: rgba(124, 58, 237, 0.12);
+  border: 1px solid rgba(124, 58, 237, 0.2);
+  border-radius: 20px;
+  padding: 2px 10px;
+  white-space: nowrap;
+  letter-spacing: 0.03em;
+}
