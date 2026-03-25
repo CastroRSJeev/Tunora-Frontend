@@ -1,18 +1,65 @@
-import React, { useState, useRef } from 'react';
-import { motion } from 'framer-motion';
-import { Play, Heart, MoreHorizontal } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Play, Heart, MoreHorizontal, Loader2, ListMusic, Plus, X, AlertTriangle } from 'lucide-react';
 import usePlayerStore from '../../stores/playerStore';
+import api from '../../lib/api';
 
-export function SongCard({ song }) {
+export function SongCard({ song, queue }) {
   const { play, currentTrack, isPlaying, pause } = usePlayerStore();
-  const [liked, setLiked] = useState(false);
+  const [liked, setLiked] = useState(song?.is_liked || false);
+  const [isLiking, setIsLiking] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const [glarePos, setGlarePos] = useState({ x: 50, y: 50 });
+  
+  // Playlist Modal State
+  const [showPlaylistModal, setShowPlaylistModal] = useState(false);
+  const [myPlaylists, setMyPlaylists] = useState([]);
+  const [playlistsLoading, setPlaylistsLoading] = useState(false);
+  const [addToPlaylistError, setAddToPlaylistError] = useState(null);
+  const [addToPlaylistSuccess, setAddToPlaylistSuccess] = useState(null);
+
   const cardRef = useRef(null);
   const isCurrentlyPlaying = currentTrack?.id === song.id && isPlaying;
 
+  useEffect(() => {
+    if (showPlaylistModal) {
+      const fetchPlaylists = async () => {
+        setPlaylistsLoading(true);
+        setAddToPlaylistError(null);
+        try {
+          const { data } = await api.get('songs/playlists/mine/');
+          setMyPlaylists(data || []);
+        } catch (err) {
+          setAddToPlaylistError('Failed to load playlists');
+        } finally {
+          setPlaylistsLoading(false);
+        }
+      };
+      fetchPlaylists();
+    }
+  }, [showPlaylistModal]);
+
+  const handleAddToPlaylist = async (playlistId) => {
+    setAddToPlaylistError(null);
+    setAddToPlaylistSuccess(null);
+    try {
+      await api.post(`songs/playlists/${playlistId}/add/`, { song_id: song.id });
+      setAddToPlaylistSuccess('Added to playlist!');
+      
+      // Auto-close modal after 1.5s on success
+      setTimeout(() => {
+        setShowPlaylistModal(false);
+        setAddToPlaylistSuccess(null);
+      }, 1500);
+    } catch (err) {
+      setAddToPlaylistError(err.response?.data?.error || 'Failed to add song');
+    }
+  };
+
   const handleMouseMove = (e) => {
+    if (showPlaylistModal) return;
     const card = cardRef.current;
     if (!card) return;
     const rect = card.getBoundingClientRect();
@@ -27,6 +74,30 @@ export function SongCard({ song }) {
     });
   };
 
+  React.useEffect(() => {
+    if (song?.is_liked !== undefined) {
+      setLiked(song.is_liked);
+    }
+  }, [song?.is_liked]);
+
+  const handleLike = async (e) => {
+    e.stopPropagation();
+    if (isLiking) return;
+    
+    setIsLiking(true);
+    const prevLiked = liked;
+    setLiked(!prevLiked); // Optimistic UI update
+    
+    try {
+      await api.post(`songs/${song.id}/like/`);
+    } catch (error) {
+      console.error('Failed to toggle like', error);
+      setLiked(prevLiked); // Revert on failure
+    } finally {
+      setIsLiking(false);
+    }
+  };
+
   const handleMouseLeave = () => {
     setHovered(false);
     setTilt({ x: 0, y: 0 });
@@ -35,6 +106,7 @@ export function SongCard({ song }) {
 
   const handlePlay = (e) => {
     e.stopPropagation();
+    if (song.is_blocked) return;
     if (isCurrentlyPlaying) pause();
     else play({
       ...song,
@@ -42,7 +114,7 @@ export function SongCard({ song }) {
       cover: song.cover_url || song.cover,
       title: song.name || song.title,
       artist: song.author || song.artist,
-    });
+    }, queue);
   };
 
   const cover = song.cover_url || song.cover || 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=400&auto=format&fit=crop';
@@ -188,24 +260,92 @@ export function SongCard({ song }) {
               {genre.split(',')[0].trim()}
             </span>
           )}
+          {song.is_blocked && (
+            <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-orange-500/10 border border-orange-500/20">
+              <AlertTriangle className="w-3 h-3 text-orange-400" />
+              <span className="text-[10px] font-bold text-orange-400 uppercase tracking-tight">Blocked by Admin</span>
+            </div>
+          )}
         </div>
 
         {/* Actions */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, opacity: hovered ? 1 : 0, transition: 'opacity 0.2s ease', zIndex: 3 }}>
           <button
-            onClick={(e) => { e.stopPropagation(); setLiked(l => !l); }}
-            style={{ width: '30px', height: '30px', borderRadius: '50%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+            onClick={handleLike}
+            disabled={isLiking}
+            style={{ width: '30px', height: '30px', borderRadius: '50%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: isLiking ? 'default' : 'pointer' }}
           >
             <Heart style={{ width: '13px', height: '13px', color: liked ? '#f43f5e' : 'rgba(240,240,245,0.5)', fill: liked ? '#f43f5e' : 'none' }} />
           </button>
           <button
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e) => { 
+                e.stopPropagation(); 
+                setShowPlaylistModal(true); 
+                setHovered(false);
+                setTilt({ x: 0, y: 0 });
+                setGlarePos({ x: 50, y: 50 });
+            }}
             style={{ width: '30px', height: '30px', borderRadius: '50%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+            title="Add to Playlist"
           >
-            <MoreHorizontal style={{ width: '13px', height: '13px', color: 'rgba(240,240,245,0.5)' }} />
+            <ListMusic style={{ width: '13px', height: '13px', color: 'rgba(240,240,245,0.5)' }} />
           </button>
         </div>
       </div>
+
+      {showPlaylistModal && createPortal(
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }} onClick={() => setShowPlaylistModal(false)} />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+            style={{ position: 'relative', width: '320px', background: '#0e0e16', border: '1px solid rgba(124,58,237,0.3)', borderRadius: '16px', padding: '20px', boxShadow: '0 24px 80px rgba(0,0,0,0.6)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ margin: 0, fontSize: '16px', color: '#f0f0f5', fontWeight: 600 }}>Add to Playlist</h3>
+              <button onClick={() => setShowPlaylistModal(false)} style={{ background: 'transparent', border: 'none', color: 'rgba(240,240,245,0.5)', cursor: 'pointer' }}><X size={16} /></button>
+            </div>
+            {playlistsLoading ? (
+              <div style={{ padding: '30px', display: 'flex', justifyContent: 'center' }}><Loader2 className="animate-spin" color="#7c3aed" /></div>
+            ) : myPlaylists.length === 0 ? (
+              <p style={{ textAlign: 'center', color: 'rgba(240,240,245,0.5)', fontSize: '13px', margin: '20px 0' }}>You have no playlists yet.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '300px', overflowY: 'auto' }}>
+                {myPlaylists.map(pl => (
+                  <button
+                    key={pl.id}
+                    onClick={() => handleAddToPlaylist(pl.id)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '8px 12px',
+                      background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', cursor: 'pointer',
+                      textAlign: 'left', transition: 'background 0.2s'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(124,58,237,0.1)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
+                  >
+                    <div style={{ width: '32px', height: '32px', borderRadius: '4px', background: '#1a1a24', overflow: 'hidden', flexShrink: 0 }}>
+                      <img src={pl.cover_url || (pl.songs?.[0]?.song?.cover_url) || cover} alt={pl.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    </div>
+                    <span style={{ fontSize: '13px', color: '#f0f0f5', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pl.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {addToPlaylistError && (
+              <div style={{ padding: '8px 12px', background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.2)', borderRadius: '8px', marginTop: '16px' }}>
+                <p style={{ color: '#f87171', fontSize: '12px', margin: 0, textAlign: 'center' }}>{addToPlaylistError}</p>
+              </div>
+            )}
+            
+            {addToPlaylistSuccess && (
+              <div style={{ padding: '8px 12px', background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.2)', borderRadius: '8px', marginTop: '16px' }}>
+                <p style={{ color: '#34d399', fontSize: '12px', margin: 0, textAlign: 'center', fontWeight: 600 }}>{addToPlaylistSuccess}</p>
+              </div>
+            )}
+          </motion.div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

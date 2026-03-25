@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import api from '../lib/api';
+import usePlayerStore from './playerStore';
 
 const parseError = (error, defaultMessage) => {
   let message = defaultMessage;
@@ -69,7 +70,12 @@ const useAuthStore = create((set, get) => ({
   login: async ({ email, password }) => {
     set({ isLoading: true, error: null });
     try {
-      const { data } = await api.post('auth/login/', { email, password });
+      const { data, status } = await api.post('auth/login/', { email, password });
+
+      if (status === 202 && data.requires_otp) {
+        set({ isLoading: false });
+        return data; // Return to UI to show OTP field
+      }
 
       localStorage.setItem('tunora_access_token', data.tokens.access);
       localStorage.setItem('tunora_refresh_token', data.tokens.refresh);
@@ -90,6 +96,30 @@ const useAuthStore = create((set, get) => ({
     }
   },
 
+  verifyAdminOtp: async ({ email, otp }) => {
+    set({ isLoading: true, error: null });
+    try {
+      const { data } = await api.post('auth/verify-admin-otp/', { email, otp });
+
+      localStorage.setItem('tunora_access_token', data.tokens.access);
+      localStorage.setItem('tunora_refresh_token', data.tokens.refresh);
+
+      set({
+        user: data.user,
+        accessToken: data.tokens.access,
+        refreshToken: data.tokens.refresh,
+        isAuthenticated: true,
+        isLoading: false,
+      });
+
+      return data;
+    } catch (error) {
+      const message = parseError(error, 'Invalid admin OTP code');
+      set({ error: message, isLoading: false });
+      throw error;
+    }
+  },
+
   logout: async () => {
     try {
       const refreshToken = get().refreshToken;
@@ -99,6 +129,9 @@ const useAuthStore = create((set, get) => ({
     } catch {
       // Best-effort logout
     } finally {
+      // Clear player state on logout
+      usePlayerStore.getState().reset();
+      
       localStorage.removeItem('tunora_access_token');
       localStorage.removeItem('tunora_refresh_token');
       set({
@@ -141,6 +174,50 @@ const useAuthStore = create((set, get) => ({
   },
 
   clearError: () => set({ error: null }),
+
+  forgotPassword: async ({ email }) => {
+    set({ isLoading: true, error: null });
+    try {
+      const { data } = await api.post('auth/forgot-password/', { email });
+      set({ isLoading: false });
+      return data;
+    } catch (error) {
+      const message = parseError(error, 'Failed to send reset code');
+      set({ error: message, isLoading: false });
+      throw error;
+    }
+  },
+
+  verifyResetOtp: async ({ email, otp }) => {
+    set({ isLoading: true, error: null });
+    try {
+      const { data } = await api.post('auth/verify-reset-otp/', { email, otp });
+      set({ isLoading: false });
+      return data;
+    } catch (error) {
+      const message = parseError(error, 'Invalid OTP code');
+      set({ error: message, isLoading: false });
+      throw error;
+    }
+  },
+
+  resetPassword: async ({ email, otp, new_password, confirm_password }) => {
+    set({ isLoading: true, error: null });
+    try {
+      const { data } = await api.post('auth/reset-password/', {
+        email,
+        otp,
+        new_password,
+        confirm_password,
+      });
+      set({ isLoading: false });
+      return data;
+    } catch (error) {
+      const message = parseError(error, 'Failed to reset password');
+      set({ error: message, isLoading: false });
+      throw error;
+    }
+  },
 }));
 
 export default useAuthStore;

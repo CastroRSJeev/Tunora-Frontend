@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, LogOut, User as UserIcon } from 'lucide-react';
+import { Menu, X, LogOut, User as UserIcon, BarChart3, Music2, Upload, ListMusic, Shield } from 'lucide-react';
 import TunoraLogo from './TunoraLogo';
 import useAuthStore from '../stores/authStore';
 
 const NAV_LINKS = [
-  { label: 'Home', path: '/' },
   { label: 'Discover', path: '/discover' },
+  { label: 'Playlists', path: '/playlists' },
 ];
 
 export default function Navbar() {
@@ -45,58 +45,56 @@ export default function Navbar() {
       </Link>
 
       {/* Desktop Nav Links */}
-      {!isAuthenticated && (
-        <div
-          style={{
-            display: 'flex',
-            gap: '8px',
-            position: 'absolute',
-            left: '50%',
-            transform: 'translateX(-50%)',
-          }}
-          className="nav-links-desktop"
-        >
-          {NAV_LINKS.map((link) => {
-            const isActive = location.pathname === link.path;
-            return (
-              <Link
-                key={link.path}
-                to={link.path}
-                style={{
-                  padding: '8px 20px',
-                  borderRadius: '10px',
-                  fontSize: '14px',
-                  fontWeight: 500,
-                  color: isActive ? '#c084fc' : '#9394a5',
-                  background: isActive ? 'rgba(124, 58, 237, 0.1)' : 'transparent',
-                  textDecoration: 'none',
-                  transition: 'all 0.3s ease',
-                  position: 'relative',
-                }}
-              >
-                {link.label}
-                {isActive && (
-                  <motion.div
-                    layoutId="nav-indicator"
-                    style={{
-                      position: 'absolute',
-                      bottom: '-2px',
-                      left: '50%',
-                      transform: 'translateX(-50%)',
-                      width: '20px',
-                      height: '2px',
-                      borderRadius: '1px',
-                      background: '#7c3aed',
-                      boxShadow: '0 0 8px rgba(124,58,237,0.5)',
-                    }}
-                    transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                  />
-                )}
-              </Link>
-            );
-          })}
-        </div>
-      )}
+      <div
+        style={{
+          display: 'flex',
+          gap: '8px',
+          position: 'absolute',
+          left: '50%',
+          transform: 'translateX(-50%)',
+        }}
+        className="nav-links-desktop"
+      >
+        {isAuthenticated && NAV_LINKS.map((link) => {
+          const isActive = location.pathname === link.path;
+          return (
+            <Link
+              key={link.path}
+              to={link.path}
+              style={{
+                padding: '8px 20px',
+                borderRadius: '10px',
+                fontSize: '14px',
+                fontWeight: 500,
+                color: isActive ? '#c084fc' : '#9394a5',
+                background: isActive ? 'rgba(124, 58, 237, 0.1)' : 'transparent',
+                textDecoration: 'none',
+                transition: 'all 0.3s ease',
+                position: 'relative',
+              }}
+            >
+              {link.label}
+              {isActive && (
+                <motion.div
+                  layoutId="nav-indicator"
+                  style={{
+                    position: 'absolute',
+                    bottom: '-2px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    width: '20px',
+                    height: '2px',
+                    borderRadius: '1px',
+                    background: '#7c3aed',
+                    boxShadow: '0 0 8px rgba(124,58,237,0.5)',
+                  }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                />
+              )}
+            </Link>
+          );
+        })}
+      </div>
 
       {/* Right side: Auth buttons or User menu */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -150,6 +148,85 @@ export default function Navbar() {
                       {user?.email || ''}
                     </p>
                   </div>
+                  {user?.role === 'admin' && (
+                    <button
+                      onClick={() => { setProfileOpen(false); navigate('/admin'); }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '8px', width: '100%',
+                        padding: '10px 12px', border: 'none', background: 'transparent',
+                        color: '#fbbf24', fontSize: '14px', cursor: 'pointer',
+                        borderRadius: '8px', transition: 'background 0.2s', fontFamily: 'var(--font-body)',
+                        marginTop: '4px',
+                      }}
+                      onMouseEnter={(e) => (e.target.style.background = 'rgba(251,191,36,0.1)')}
+                      onMouseLeave={(e) => (e.target.style.background = 'transparent')}
+                    >
+                      <Shield size={14} />
+                      Admin Dashboard
+                    </button>
+                  )}
+                  {user?.role === 'artist' && (
+                    <>
+                      <button
+                        onClick={() => { setProfileOpen(false); navigate('/dashboard'); }}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '8px', width: '100%',
+                          padding: '10px 12px', border: 'none', background: 'transparent',
+                          color: 'var(--color-text-secondary)', fontSize: '14px', cursor: 'pointer',
+                          borderRadius: '8px', transition: 'background 0.2s', fontFamily: 'var(--font-body)',
+                          marginTop: '4px',
+                        }}
+                        onMouseEnter={(e) => (e.target.style.background = 'rgba(124,58,237,0.1)')}
+                        onMouseLeave={(e) => (e.target.style.background = 'transparent')}
+                      >
+                        <BarChart3 size={14} />
+                        Creator Studio
+                      </button>
+                      <button
+                        onClick={() => { setProfileOpen(false); navigate('/my-uploads'); }}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '8px', width: '100%',
+                          padding: '10px 12px', border: 'none', background: 'transparent',
+                          color: 'var(--color-text-secondary)', fontSize: '14px', cursor: 'pointer',
+                          borderRadius: '8px', transition: 'background 0.2s', fontFamily: 'var(--font-body)',
+                        }}
+                        onMouseEnter={(e) => (e.target.style.background = 'rgba(124,58,237,0.1)')}
+                        onMouseLeave={(e) => (e.target.style.background = 'transparent')}
+                      >
+                        <Music2 size={14} />
+                        My Uploads
+                      </button>
+                      <button
+                        onClick={() => { setProfileOpen(false); navigate('/upload'); }}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '8px', width: '100%',
+                          padding: '10px 12px', border: 'none', background: 'transparent',
+                          color: 'var(--color-text-secondary)', fontSize: '14px', cursor: 'pointer',
+                          borderRadius: '8px', transition: 'background 0.2s', fontFamily: 'var(--font-body)',
+                        }}
+                        onMouseEnter={(e) => (e.target.style.background = 'rgba(124,58,237,0.1)')}
+                        onMouseLeave={(e) => (e.target.style.background = 'transparent')}
+                      >
+                        <Upload size={14} />
+                        Upload Song
+                      </button>
+                    </>
+                  )}
+                  <button
+                    onClick={() => { setProfileOpen(false); navigate('/my-playlists'); }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '8px', width: '100%',
+                      padding: '10px 12px', border: 'none', background: 'transparent',
+                      color: 'var(--color-text-secondary)', fontSize: '14px', cursor: 'pointer',
+                      borderRadius: '8px', transition: 'background 0.2s', fontFamily: 'var(--font-body)',
+                      marginTop: user?.role === 'artist' ? '0px' : '4px',
+                    }}
+                    onMouseEnter={(e) => (e.target.style.background = 'rgba(124,58,237,0.1)')}
+                    onMouseLeave={(e) => (e.target.style.background = 'transparent')}
+                  >
+                    <ListMusic size={14} />
+                    My Playlists
+                  </button>
                   <button
                     onClick={handleLogout}
                     style={{
@@ -247,7 +324,7 @@ export default function Navbar() {
               borderTop: '1px solid var(--color-border)',
             }}
           >
-            {!isAuthenticated && NAV_LINKS.map((link) => (
+            {isAuthenticated && NAV_LINKS.map((link) => (
               <Link
                 key={link.path}
                 to={link.path}

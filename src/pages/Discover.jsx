@@ -1,16 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Disc, Search, Sparkles, Loader2, Music2, X, Wand2, Upload } from 'lucide-react';
+import { Disc, Search, Sparkles, Loader2, Music2, X, Wand2, Upload, ListMusic } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import useAuthStore from '../stores/authStore';
+import useMusicStore from '../stores/musicStore';
 import { SongCard } from '../components/ui/SongCard';
+import { PlaylistCard } from '../components/ui/PlaylistCard';
 
 export default function Discover() {
   const { user } = useAuthStore();
+  const { songs: cachedSongs, featuredPlaylists, setSongs, setFeaturedPlaylists, isSongsLoaded, isFeaturedLoaded } = useMusicStore();
   const navigate = useNavigate();
-  const [songs, setSongs] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!isSongsLoaded);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
 
@@ -18,50 +20,77 @@ export default function Discover() {
   const [aiOpen, setAiOpen] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiResults, setAiResults] = useState([]);
+  const [aiPlaylists, setAiPlaylists] = useState([]);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState(null);
+  const [publicPlaylists, setPublicPlaylists] = useState([]);
   const textareaRef = useRef(null);
 
   const isArtist = user?.role === 'artist';
 
+  // Fetch data on mount
   useEffect(() => {
-    const fetchSongs = async () => {
-      setLoading(true);
+    const fetchInitialData = async () => {
+      // If we already have data, don't show the initial heavy loader 
+      // but still update in background.
+      if (!isSongsLoaded) setLoading(true);
       setError(null);
       try {
-        const { data } = await api.get('songs/');
-        const allSongs = Array.isArray(data) ? data : (data.results || []);
-        const preferredGenres = user?.favourite_genres || [];
-        const preferredAuthors = user?.favourite_artists || [];
-        const tier1 = allSongs.filter(s =>
-          preferredGenres.some(g => (s.genre || '').toLowerCase().includes(g.toLowerCase())) &&
-          preferredAuthors.some(a => (s.artist || s.author || '').includes(a))
-        );
-        const tier2 = allSongs.filter(s =>
-          preferredGenres.some(g => (s.genre || '').toLowerCase().includes(g.toLowerCase())) && !tier1.find(t => t.id === s.id)
-        );
-        const tier3 = allSongs.filter(s =>
-          preferredAuthors.some(a => (s.artist || s.author || '').includes(a)) &&
-          !tier1.find(t => t.id === s.id) && !tier2.find(t => t.id === s.id)
-        );
-        const tier4 = allSongs.filter(s =>
-          !tier1.find(t => t.id === s.id) && !tier2.find(t => t.id === s.id) && !tier3.find(t => t.id === s.id)
-        );
-        setSongs([...tier1, ...tier2, ...tier3, ...tier4]);
+        // Fetch songs and public playlists in parallel for speed
+        const [songsRes, playlistsRes] = await Promise.all([
+          api.get('songs/'),
+          api.get('songs/playlists/public/')
+        ]);
+        
+        const allSongs = Array.isArray(songsRes.data) ? songsRes.data : (songsRes.data.results || []);
+        setSongs(allSongs);
+        setFeaturedPlaylists((playlistsRes.data || []).slice(0, 4));
       } catch (err) {
-        setError(err.response?.data?.detail || err.message || 'Unable to load feed.');
-        setSongs([]);
+        if (!isSongsLoaded) setError(err.response?.data?.detail || err.message || 'Unable to load feed.');
       } finally {
         setLoading(false);
       }
     };
-    if (user) fetchSongs();
-  }, [user]);
+    
+    fetchInitialData();
+  }, []); // Only on mount
 
-  // Focus textarea when modal opens
+  // Optimized personalized tiering with useMemo
+  const songs = React.useMemo(() => {
+    if (!cachedSongs.length) return [];
+    if (!user) return cachedSongs;
+
+    const preferredGenres = user?.favourite_genres || [];
+    const preferredAuthors = user?.favourite_artists || [];
+    
+    const tier1 = [], tier2 = [], tier3 = [], tier4 = [];
+    
+    for (const s of cachedSongs) {
+      const matchGenre = preferredGenres.some(g => (s.genre || '').toLowerCase().includes(g.toLowerCase()));
+      const matchArtist = preferredAuthors.some(a => (s.artist || s.author || '').includes(a));
+      
+      if (matchGenre && matchArtist) tier1.push(s);
+      else if (matchGenre) tier2.push(s);
+      else if (matchArtist) tier3.push(s);
+      else tier4.push(s);
+    }
+    
+    return [...tier1, ...tier2, ...tier3, ...tier4];
+  }, [cachedSongs, user]);
+
+  // Focus textarea when modal opens AND lock body scroll
   useEffect(() => {
-    if (aiOpen) setTimeout(() => textareaRef.current?.focus(), 100);
-    else { setAiPrompt(''); setAiResults([]); setAiError(null); }
+    if (aiOpen) {
+      document.body.style.overflow = 'hidden';
+      setTimeout(() => textareaRef.current?.focus(), 100);
+    } else {
+      document.body.style.overflow = 'auto';
+      setAiPrompt('');
+      setAiResults([]);
+      setAiPlaylists([]);
+      setAiError(null);
+    }
+    return () => { document.body.style.overflow = 'auto'; }; // cleanup
   }, [aiOpen]);
 
   const handleAiSearch = async () => {
@@ -69,9 +98,11 @@ export default function Discover() {
     setAiLoading(true);
     setAiError(null);
     setAiResults([]);
+    setAiPlaylists([]);
     try {
       const { data } = await api.post('recommendations/recommend/', { prompt: aiPrompt });
-      setAiResults(data.results || []);
+      setAiResults(data.songs || data.results || []);
+      setAiPlaylists(data.playlists || []);
     } catch (err) {
       setAiError(err.response?.data?.error || 'Something went wrong.');
     } finally {
@@ -84,7 +115,7 @@ export default function Discover() {
     (s.artist || s.author || '').toLowerCase().includes(search.toLowerCase())
   );
 
-  const SUGGESTIONS = ['a cool song for car edit', 'chill vibes for late night', 'hype gym workout', 'sad rainy day'];
+  const SUGGESTIONS = ['chill vibes', 'gym workout', 'relaxing piano', 'deep house'];
 
   return (
     <div style={{ minHeight: '100vh', paddingTop: '72px', width: '100%', boxSizing: 'border-box' }}>
@@ -220,7 +251,7 @@ export default function Discover() {
             <AnimatePresence mode="popLayout">
               {filteredSongs.map((song, i) => (
                 <motion.div layout key={song.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.3, delay: i < 12 ? i * 0.03 : 0 }}>
-                  <SongCard song={song} />
+                  <SongCard song={song} queue={filteredSongs} />
                 </motion.div>
               ))}
             </AnimatePresence>
@@ -232,6 +263,32 @@ export default function Discover() {
             <Disc style={{ width: '48px', height: '48px', color: 'rgba(255,255,255,0.06)', marginBottom: '20px' }} />
             <h2 style={{ fontSize: '22px', fontWeight: 700, color: '#f0f0f5', marginBottom: '8px' }}>The Stage is Quiet</h2>
             <p style={{ color: 'rgba(255,255,255,0.2)', maxWidth: '360px', fontSize: '14px' }}>No tracks found. Check back later.</p>
+          </div>
+        )}
+
+        {/* Featured Playlists Section */}
+        {featuredPlaylists.length > 0 && (
+          <div style={{ marginTop: '80px', borderTop: '1px solid rgba(255,255,255,0.04)', paddingTop: '48px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+               <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                    <ListMusic style={{ width: '12px', height: '12px', color: '#7c3aed' }} />
+                    <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(124,58,237,0.6)', fontWeight: 600 }}>Curated Collections</span>
+                  </div>
+                  <h2 style={{ fontSize: '22px', fontWeight: 700, color: '#f0f0f5', margin: 0 }}>Featured Playlists</h2>
+               </div>
+               <button onClick={() => navigate('/playlists')} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', padding: '10px 20px', color: 'rgba(240,240,245,0.6)', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-body)' }} onMouseEnter={e => (e.target.style.background = 'rgba(255,255,255,0.06)')} onMouseLeave={e => (e.target.style.background = 'rgba(255,255,255,0.03)')}>
+                 View All
+               </button>
+            </div>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+              {featuredPlaylists.map((pl, i) => (
+                <motion.div key={pl.id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.2 + i * 0.05 }}>
+                   <PlaylistCard playlist={pl} />
+                </motion.div>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -285,7 +342,7 @@ export default function Discover() {
               </div>
 
               {/* Scrollable body */}
-              <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+              <div data-lenis-prevent style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
 
                 {/* Prompt input */}
                 <textarea
@@ -293,7 +350,7 @@ export default function Discover() {
                   value={aiPrompt}
                   onChange={e => setAiPrompt(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) e.preventDefault(); }}
-                  placeholder="e.g. a cool song for car edit, chill vibes for late night..."
+                  placeholder="Describe the vibe you're looking for..."
                   rows={2}
                   style={{
                     width: '100%', resize: 'none',
@@ -349,7 +406,7 @@ export default function Discover() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '12px' }}>
                   <Sparkles style={{ width: '12px', height: '12px', color: '#a78bfa' }} />
                   <span style={{ fontSize: '11px', color: 'rgba(167,139,250,0.6)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                    {aiResults.length > 0 ? `Top ${aiResults.length} matches` : 'Results'}
+                    {aiResults.length > 0 ? `Top ${Math.min(aiResults.length, 10)} matches` : 'Results'}
                   </span>
                 </div>
 
@@ -360,22 +417,52 @@ export default function Discover() {
 
                 {/* Results grid */}
                 {aiResults.length > 0 && (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                    {aiResults.map((song, i) => (
-                      <motion.div
-                        key={song.id}
-                        initial={{ opacity: 0, y: 12 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.3, delay: i * 0.05 }}
-                      >
-                        <SongCard song={song} />
-                      </motion.div>
-                    ))}
-                  </div>
+                  <>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '12px', marginTop: '16px' }}>
+                      <span style={{ fontSize: '11px', color: 'rgba(167,139,250,0.6)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                        Songs
+                      </span>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px', padding: '4px' }}>
+                      {aiResults.slice(0, 10).map((song, i) => (
+                        <motion.div
+                          key={song.id}
+                          initial={{ opacity: 0, y: 12 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.3, delay: i * 0.05 }}
+                          style={{ perspective: '1000px' }} // Added perspective for 3D tilt
+                        >
+                          <SongCard song={song} queue={aiResults.slice(0, 10)} />
+                        </motion.div>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {aiPlaylists.length > 0 && (
+                  <>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '12px', marginTop: '24px' }}>
+                      <span style={{ fontSize: '11px', color: 'rgba(167,139,250,0.6)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                        Playlists
+                      </span>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px', padding: '4px' }}>
+                      {aiPlaylists.slice(0, 10).map((pl, i) => (
+                        <motion.div
+                          key={pl.id}
+                          initial={{ opacity: 0, y: 12 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.3, delay: i * 0.05 }}
+                        >
+                          <PlaylistCard playlist={pl} />
+                        </motion.div>
+                      ))}
+                    </div>
+                  </>
                 )}
 
                 {/* Empty state before search */}
-                {!aiLoading && aiResults.length === 0 && !aiError && (
+                {!aiLoading && aiResults.length === 0 && aiPlaylists.length === 0 && !aiError && (
                   <div style={{ textAlign: 'center', padding: '24px 0', color: 'rgba(240,240,245,0.2)', fontSize: '13px' }}>
                     Describe the music you want above and hit Find Songs
                   </div>

@@ -12,9 +12,11 @@ const usePlayerStore = create((set, get) => ({
   repeatMode: 'off', // 'off' | 'all' | 'one'
 
   // Playback controls
-  play: (track) => {
+  play: (track, newQueue) => {
     if (track) {
-      set({ currentTrack: track, isPlaying: true, progress: 0 });
+      const update = { currentTrack: track, isPlaying: true, progress: 0 };
+      if (newQueue) update.queue = newQueue;
+      set(update);
     } else {
       set({ isPlaying: true });
     }
@@ -58,6 +60,16 @@ const usePlayerStore = create((set, get) => ({
       const next = modes[(modes.indexOf(state.repeatMode) + 1) % modes.length];
       return { repeatMode: next };
     }),
+
+  reset: () => set({
+    currentTrack: null,
+    isPlaying: false,
+    queue: [],
+    progress: 0,
+    duration: 0,
+    isShuffled: false,
+    repeatMode: 'off'
+  }),
 }));
 
 export default usePlayerStore;
