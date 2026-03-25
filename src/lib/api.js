@@ -12,7 +12,7 @@ const api = axios.create({
 // — Request interceptor: attach JWT token
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('tunora_access_token');
+    const token = localStorage.getItem('tunora_access_token') || sessionStorage.getItem('tunora_access_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -31,16 +31,19 @@ api.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        const refreshToken = localStorage.getItem('tunora_refresh_token');
+        const refreshToken = localStorage.getItem('tunora_refresh_token') || sessionStorage.getItem('tunora_refresh_token');
+        const isPersistent = !!localStorage.getItem('tunora_refresh_token');
+        const storage = isPersistent ? localStorage : sessionStorage;
+
         if (!refreshToken) throw new Error('No refresh token');
 
         const { data } = await axios.post(`${API_BASE_URL}auth/refresh/`, {
           refresh: refreshToken,
         });
 
-        localStorage.setItem('tunora_access_token', data.access);
+        storage.setItem('tunora_access_token', data.access);
         if (data.refresh) {
-          localStorage.setItem('tunora_refresh_token', data.refresh);
+          storage.setItem('tunora_refresh_token', data.refresh);
         }
 
         originalRequest.headers.Authorization = `Bearer ${data.access}`;
@@ -48,6 +51,8 @@ api.interceptors.response.use(
       } catch (refreshError) {
         localStorage.removeItem('tunora_access_token');
         localStorage.removeItem('tunora_refresh_token');
+        sessionStorage.removeItem('tunora_access_token');
+        sessionStorage.removeItem('tunora_refresh_token');
         window.location.href = '/login';
         return Promise.reject(refreshError);
       }

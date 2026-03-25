@@ -103,13 +103,13 @@ export default function Login() {
     try {
       if (showOtp) {
         // Admin OTP verification
-        const { user } = await useAuthStore.getState().verifyAdminOtp({ email, otp });
+        const { user } = await useAuthStore.getState().verifyAdminOtp({ email, otp, rememberMe });
         if (user) navigate('/admin'); // Admins go to dashboard
         return;
       }
 
       // Initial login (password)
-      const data = await login({ email, password });
+      const data = await login({ email, password, rememberMe });
       
       if (data?.requires_otp) {
         setShowOtp(true);

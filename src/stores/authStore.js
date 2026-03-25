@@ -22,9 +22,9 @@ const parseError = (error, defaultMessage) => {
 
 const useAuthStore = create((set, get) => ({
   user: null,
-  accessToken: localStorage.getItem('tunora_access_token') || null,
-  refreshToken: localStorage.getItem('tunora_refresh_token') || null,
-  isAuthenticated: !!localStorage.getItem('tunora_access_token'),
+  accessToken: localStorage.getItem('tunora_access_token') || sessionStorage.getItem('tunora_access_token') || null,
+  refreshToken: localStorage.getItem('tunora_refresh_token') || sessionStorage.getItem('tunora_refresh_token') || null,
+  isAuthenticated: !!(localStorage.getItem('tunora_access_token') || sessionStorage.getItem('tunora_access_token')),
   isLoading: false,
   error: null,
 
@@ -67,18 +67,25 @@ const useAuthStore = create((set, get) => ({
     }
   },
 
-  login: async ({ email, password }) => {
+  login: async ({ email, password, rememberMe = false }) => {
     set({ isLoading: true, error: null });
     try {
       const { data, status } = await api.post('auth/login/', { email, password });
 
       if (status === 202 && data.requires_otp) {
         set({ isLoading: false });
-        return data; // Return to UI to show OTP field
+        // We might want to save rememberMe state for the OTP step if needed, 
+        // but passing it again is also fine.
+        return data;
       }
 
-      localStorage.setItem('tunora_access_token', data.tokens.access);
-      localStorage.setItem('tunora_refresh_token', data.tokens.refresh);
+      const storage = rememberMe ? localStorage : sessionStorage;
+      const otherStorage = rememberMe ? sessionStorage : localStorage;
+
+      storage.setItem('tunora_access_token', data.tokens.access);
+      storage.setItem('tunora_refresh_token', data.tokens.refresh);
+      otherStorage.removeItem('tunora_access_token');
+      otherStorage.removeItem('tunora_refresh_token');
 
       set({
         user: data.user,
@@ -96,13 +103,18 @@ const useAuthStore = create((set, get) => ({
     }
   },
 
-  verifyAdminOtp: async ({ email, otp }) => {
+  verifyAdminOtp: async ({ email, otp, rememberMe = false }) => {
     set({ isLoading: true, error: null });
     try {
       const { data } = await api.post('auth/verify-admin-otp/', { email, otp });
 
-      localStorage.setItem('tunora_access_token', data.tokens.access);
-      localStorage.setItem('tunora_refresh_token', data.tokens.refresh);
+      const storage = rememberMe ? localStorage : sessionStorage;
+      const otherStorage = rememberMe ? sessionStorage : localStorage;
+
+      storage.setItem('tunora_access_token', data.tokens.access);
+      storage.setItem('tunora_refresh_token', data.tokens.refresh);
+      otherStorage.removeItem('tunora_access_token');
+      otherStorage.removeItem('tunora_refresh_token');
 
       set({
         user: data.user,
@@ -134,6 +146,8 @@ const useAuthStore = create((set, get) => ({
       
       localStorage.removeItem('tunora_access_token');
       localStorage.removeItem('tunora_refresh_token');
+      sessionStorage.removeItem('tunora_access_token');
+      sessionStorage.removeItem('tunora_refresh_token');
       set({
         user: null,
         accessToken: null,
